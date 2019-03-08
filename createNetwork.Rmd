@@ -1,0 +1,238 @@
+---
+title: "explore"
+author: "Hang Jiang"
+date: "2/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(igraph)
+library(wordVectors)
+library(stringr)
+library(dplyr)
+```
+
+## create network
+
+### 1. train word2vec
+
+```{r train word2vec}
+
+# con <- file("book.txt", "r", blocking = FALSE)
+# out <- file("lemma.txt", "w")
+# text <- readLines(con)
+# for (sent in text[0:10]) {
+#   if (sent != "") {
+#     temp <- stringr::str_replace_all(sent,"[^a-zA-Z\\s]", " ")
+#     temp <- stringr::str_replace_all(temp,"[\\s]+", " ")
+#     temp <- stringr::str_split(temp, " ")[[1]]
+#     indexes <- which(temp == "")
+#     if(length(indexes) > 0){
+#       temp <- temp[-indexes]
+#     }
+#     print(paste(temp, collapse = " "))
+#   }
+# }
+# close(con)
+
+model = train_word2vec("data/lemma_book.txt",
+                        output="corpus.bin", threads = 4,
+                        vectors = 100, window=20, cbow=1, min_count = 5, force= TRUE)
+```
+
+```{r}
+rownames(model)
+```
+
+### 2. create similarity table
+
+```{r compute similarities}
+
+# find the vocabulary
+
+book_words <- read.delim("data/book_words_set.txt", header = FALSE, sep = "\t", dec = ".")
+names(book_words) <- c("word")
+
+book_words_list <- as.character(book_words$word)
+
+vocab <- book_words_list
+print(typeof(vocab))
+typeof(vocab)
+print(length(rownames(model)))
+
+# for (each in rownames(model)) {
+#   if (each %in% vocab) {
+#     print(paste(each))
+#   }
+# }
+
+costMatrix <- cosineSimilarity(model[[which(rownames(model) %in% vocab), average=FALSE]], 
+                 model[[which(rownames(model) %in% vocab), average=FALSE]])
+
+links <- as.data.frame(as.table(costMatrix))
+
+names(links) <- c("from", "to", "sim") # rename
+
+links$from <- as.character (links$from)
+
+links$to <- as.character (links$to)
+
+links <- filter(links, from > to)
+
+```
+
+## Network Building
+
+You can also embed plots, for example:
+
+```{r network, echo=FALSE}
+source("helper.R")
+
+net <- graph_from_data_frame(d=links, vertices = vocab, directed = FALSE)
+
+# plot_vocab_network(net,labels = NA)
+
+```
+
+## Strength Ranking
+
+```{r}
+
+E(net)$weight <- E(net)$sim
+
+strengthDegree <- strength(net)
+
+strengthRank = sort(strengthDegree, decreasing = TRUE)
+
+strengthRank[0:20]
+
+```
+
+## Closeness Ranking
+
+```{r}
+
+E(net)$weight <-  1 - E(net)$sim
+ClosenessDegree <- closeness(net)
+
+V(net)[100:200]
+
+closenessRank <- sort(ClosenessDegree, decreasing = TRUE)
+
+closenessRank[0:20]
+
+```
+
+
+
+## assortativity rank
+
+```{r}
+E(net)$weight <-  E(net)$sim
+assortativityDegree <- assortativity(net, V(net), directed=FALSE)
+print(assortativityDegree)
+```
+
+## tansitivity rank
+
+```{r}
+
+# par(mfrow=c(1,2), mar=rep(1,4))
+# 
+# dense_clusters <- clique.community.opt(net, 2)
+# 
+# print(transitivity(net))
+# 
+# print(edge_density(net, loops=T))
+# 
+# clusters <- cluster_walktrap(net, weights = E(net)$weight)
+# 
+# plot_vocab_network(net,
+#                      clusters = clusters$membership,
+#                      frame = FALSE,
+#                      labels = "")
+
+```
+
+## Calculate correlation between 
+
+```{r}
+
+interaction_list <- read.delim("intersection.txt", header = FALSE, sep = "\t", dec = ".")
+names(interaction_list) <- c('word')
+interaction_list
+rebecca_list <- read.delim("rebecca_words.txt", header = FALSE, sep = "\t", dec = ".")
+names(rebecca_list) <- c('word')
+rebecca_v <- rebecca_list %>%
+  filter(word %in% interaction_list$word)
+
+# write strenth rank to file
+strength_vec = c()
+for (name in names(strengthRank)) {
+  if (name %in% interaction_list$word) {
+    strength_vec <- c(strength_vec, name)
+  }
+}
+
+write(strength_vec, file = "strength_rank")
+
+# write rebecca rank to file
+
+print(as.character(strength_vec))
+
+print(typeof(rebecca_vec))
+rebecca_vec = c()
+for (word in as.character(rebecca_v$word)) {
+  rebecca_vec <- c(rebecca_vec, word)
+}
+
+write(rebecca_vec, file = "rebecca_rank", ncolumns = )
+
+
+# closeRank <- sort(ClosenessDegree, decreasing = TRUE)
+# 
+# typeof(closeRank)
+cor(rebecca_vec, strength_vec, method = c("pearson", "kendall", "spearman"))
+
+cor(rank(rebecca_vec), rank(strength_vec), method = c("kendall"))
+
+```
+
+
+
+
+```{r}
+print(as.character(rebecca_v$word))
+rebecca_vec
+strength_vec
+
+# create data frame for each measure and include frequency
+# left join the dataframes to get the big dataframe
+# calculate correlations between columns using rank()
+
+# do lemmatization (verbs, plural, tense) for words in book.txt
+
+```
+
+
+
+
+
+
+
+# to see word difficulty, we want to prepare the two rankings:
+- frequency ranking (using easy method)
+- strength ranking
+- closeness
+- assortativity
+- use more measure mentioned in the paper
+
+# calculate Pearson, Kendal correlation
+- to see what we get
+
+
+
+
+
+
+
