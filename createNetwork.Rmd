@@ -158,43 +158,52 @@ print(assortativityDegree)
 
 ```{r}
 
-interaction_list <- read.delim("intersection.txt", header = FALSE, sep = "\t", dec = ".")
+interaction_list <- read.delim("data/intersection.txt", header = FALSE, sep = "\t", dec = ".")
 names(interaction_list) <- c('word')
 interaction_list
-rebecca_list <- read.delim("rebecca_words.txt", header = FALSE, sep = "\t", dec = ".")
+rebecca_list <- read.delim("data/rebecca_words.txt", header = FALSE, sep = "\t", dec = ".")
 names(rebecca_list) <- c('word')
 rebecca_v <- rebecca_list %>%
   filter(word %in% interaction_list$word)
+rebecca_v
 
-# write strenth rank to file
+
+# strengthRank
+
 strength_vec = c()
 for (name in names(strengthRank)) {
   if (name %in% interaction_list$word) {
     strength_vec <- c(strength_vec, name)
   }
 }
+write(strength_vec, file = "data/strength_rank")
 
-write(strength_vec, file = "strength_rank")
+# closenessRank
+
+close_rank_vec = c()
+for (name in names(closenessRank)) {
+  if (name %in% interaction_list$word) {
+    close_rank_vec <- c(close_rank_vec, name)
+  }
+}
+write(close_rank_vec, file = "data/close_rank")
 
 # write rebecca rank to file
 
-print(as.character(strength_vec))
-
-print(typeof(rebecca_vec))
+print(typeof(rebecca_v))
 rebecca_vec = c()
 for (word in as.character(rebecca_v$word)) {
   rebecca_vec <- c(rebecca_vec, word)
 }
-
-write(rebecca_vec, file = "rebecca_rank", ncolumns = )
+write(rebecca_vec, file = "data/rebecca_rank", ncolumns = )
 
 
 # closeRank <- sort(ClosenessDegree, decreasing = TRUE)
 # 
 # typeof(closeRank)
-cor(rebecca_vec, strength_vec, method = c("pearson", "kendall", "spearman"))
-
-cor(rank(rebecca_vec), rank(strength_vec), method = c("kendall"))
+# cor(rebecca_vec, strength_vec, method = c("pearson", "kendall", "spearman"))
+# 
+# cor(rank(rebecca_vec), rank(strength_vec), method = c("kendall"))
 
 ```
 
