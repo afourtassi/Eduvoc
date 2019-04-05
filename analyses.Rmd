@@ -1,0 +1,53 @@
+---
+title: "WordRec Experiment"
+author: "A. Fourtassi"
+date: "November 26, 2018"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+---
+Libraries.
+
+```{r}
+library(kableExtra)
+library(readr)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(knitr)
+library(nlstools)
+library(boot)
+library(dplyr)
+library(langcog)
+library(ggthemes)
+library(broom)
+```
+
+Data and processing
+```{r}
+
+
+data <- read.csv(file="ranks_04_04.csv", header=TRUE, sep=",") %>%
+  as.data.frame() 
+
+freq_childs <- read.csv(file="log_freq.csv", header=TRUE, sep=",") %>%
+  as.data.frame() %>%
+  rename(word = uni_lemma,
+         freq_chil = freq)
+
+data.scaled <- data %>%
+  left_join(freq_childs) %>%
+  mutate_each_(funs(scale(.) %>% as.vector), 
+                             vars=c("rebec","strgth","close","betw","eigen","degree","freq", "freq_chil"))
+
+model0 <- lm(rebec ~ freq_chil, data=data.scaled)
+summary(model0)
+
+model1 <- lm(rebec ~ strgth + freq_chil, data=data.scaled)
+summary(model1)
+
+anova(model0, model1)
+
+```
