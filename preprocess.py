@@ -5,9 +5,12 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 import re, string
 
+# DIR = 'fb_data'
+# BOOK_FILE = '{}/cbt.txt'.format(DIR)
+# PPVT_LEMMA_FILE = '{}/PPVT_lemma.csv'.format(DIR)
 
-def read_rebecca_lemma():
-    with open('data/PPVT_lemma.csv') as f:
+def read_rebecca_lemma(PPVT_LEMMA_FILE):
+    with open(PPVT_LEMMA_FILE) as f:
         lines = f.readlines()
         ranked_words = [line.strip() for line in lines]
     return ranked_words
@@ -37,14 +40,14 @@ def lemmatize_sentence(sentence, lemmatizer, pos_words):
             pos_words[tag].add(word)
     return " ".join(res_words)
 
-def lemmatize_book():
+def lemmatize_book(BOOK_FILE, LEMMA_BOOK_FILE):
     """
     returns book_words<list>, pos_words<dict<set>>
     """
     lemmatizer = WordNetLemmatizer()
     book_words = []
     pos_words = {wordnet.NOUN: set(), wordnet.VERB: set()}
-    with open('data/book.txt') as f, open('data/lemma_book.txt', 'w') as out:
+    with open(BOOK_FILE) as f, open(LEMMA_BOOK_FILE, 'w') as out:
         for line in f:
             if len(line) > 1:
                 regex = "[%s’]" % re.escape(string.punctuation)
@@ -55,26 +58,26 @@ def lemmatize_book():
                 out.write(line)
     return book_words, pos_words
 
-def generate_wordset_files(book_words, ranked_words):
+def generate_wordset_files(book_words, ranked_words, DIR):
 
     book_words_set = set(book_words)
     ranked_words_set = set(ranked_words)
     intersection_set = book_words_set.intersection(ranked_words_set)
 
     print(len(intersection_set))
-    with open('data/intersection.txt', 'w') as out:
+    with open('{}/intersection.txt'.format(DIR), 'w') as out:
         for word in intersection_set:
             out.write(word)
             out.write('\n')
 
     print(len(book_words_set))
-    with open('data/book_words_set.txt', 'w') as out:
+    with open('{}/book_words_set.txt'.format(DIR), 'w') as out:
         for word in book_words_set:
             out.write(word)
             out.write('\n')
 
     print(len(ranked_words_set))       
-    with open('data/rebecca_words.txt', 'w') as out:
+    with open('{}/rebecca_words.txt'.format(DIR), 'w') as out:
         for word in ranked_words:
             out.write(word)
             out.write('\n')

@@ -13,10 +13,11 @@ task
 3. `visualize.py`: visualize network by sampling
 """
 
+DIR = 'fb_data'
 GOOGLE_W2V_FILE = './model/GoogleNews-vectors-negative300.bin'
-BOOK_WORD_SET_FILE = 'data/book_words_set.txt'
-REBECCA_WORD_FILE = 'data/rebecca_words.txt'
-LEMMA_BOOK_FILE = "data/lemma_book.txt"
+BOOK_WORD_SET_FILE = '{}/book_words_set.txt'.format(DIR)
+REBECCA_WORD_FILE = '{}/rebecca_words.txt'.format(DIR)
+LEMMA_BOOK_FILE = "{}/cbt_lemma.txt".format(DIR)
 
 
 def read_file_to_list(FILENAME):
@@ -48,12 +49,12 @@ def load_pretrained_word2vec(documents, size, min_count, iters, retrain=False):
 	model_2.train(documents, total_examples=total_examples, epochs=model_2.epochs)
 	return model_2
 
-def train_word2vec(documents, size, min_count, iters):
+def train_word2vec(documents, size=300, min_count=5, iters=100, window=20):
 	model = gensim.models.Word2Vec(
         documents,
         sg=0,
         size=size,
-        window=20,
+        window=window,
         min_count=min_count,
         iter=iters,
         workers=4)
