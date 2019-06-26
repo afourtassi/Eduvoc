@@ -14,24 +14,24 @@ task
 """
 
 DIR = 'fb_data'
-GOOGLE_W2V_FILE = './model/GoogleNews-vectors-negative300.bin'
+# paths to the 3 generated files from preprocess.py
 BOOK_WORD_SET_FILE = '{}/book_words_set.txt'.format(DIR)
 REBECCA_WORD_FILE = '{}/rebecca_words.txt'.format(DIR)
 LEMMA_BOOK_FILE = "{}/cbt_lemma.txt".format(DIR)
 
-
-def read_file_to_list(FILENAME):
+def read_file_to_list(filename):
 	words = []
-	with open(FILENAME, 'r') as f:
+	with open(filename, 'r') as f:
 	    for word in f:
 	        words.append(word.strip())
 	return words
 
 def getDistance(w1, w2, model):
 
-    return abs(1-spatial.distance.cosine(model.wv[w1], model.wv[w2]))
+    return abs(spatial.distance.cosine(model.wv[w1], model.wv[w2]))
 
 def load_pretrained_word2vec(documents, size, min_count, iters, retrain=False):
+	GOOGLE_W2V_FILE = './model/GoogleNews-vectors-negative300.bin'
 	model = KeyedVectors.load_word2vec_format(GOOGLE_W2V_FILE, binary=True)  
 	if not retrain:
 		return model
@@ -69,15 +69,15 @@ def build_graph(model, sampling_size=0):
 	print("word2vec:\t", len(model.wv.vocab))
 	print("book_set:\t", len(book_set))
 	print("edu_set:\t", len(edu_set))
-	surrounding_words = set(model.wv.vocab.keys()).intersection(book_set)
-	surrounding_words = set(surrounding_words).difference(edu_set)
-	print('surrounding words', len(surrounding_words))
+# 	surrounding_words = set(model.wv.vocab.keys()).intersection(book_set)
+# 	surrounding_words = set(surrounding_words).difference(edu_set)
+# 	print('surrounding words', len(surrounding_words))
 	intersection_words = set(model.wv.vocab.keys()).intersection(edu_set)
 	print('intersertion words', len(intersection_words))
 
 	if sampling_size:
 		token2vec = {}
-		rand_words = random.sample(surrounding_words, sampling_size)
+		rand_words = random.sample(intersection_words, sampling_size)
 		for word in rand_words:
 			token2vec[word] = model.wv[word]
 		for word in intersection_words:
@@ -97,44 +97,54 @@ def build_graph(model, sampling_size=0):
 	vertices = [idx for idx in range(len(token2vec))]
 	edges = [(i, j) for i in vertices for j in vertices if i < j]
 	g = Graph(vertex_attrs={"label":vertices}, edges=edges, directed=False)
-	g.es["weight"] = [getDistance(id2token[i], id2token[j], model) for i,j in edges]
-
+	g.es["sim"] = [getSimilarity(id2token[i], id2token[j], model) for i,j in edges]
+	g.es["dist"] = np.array(1-np.array(g.es['sim'])).tolist()
 	# test validity
-	# assert(getDistance('man', 'woman', model) == g[token2id['man'], token2id['woman']] )
-	# assert(getDistance('cat', 'dog', model) == g[token2id['cat'], token2id['dog']] )
+	# assert(getSimilarity('man', 'woman', model) == g[token2id['man'], token2id['woman']] )
+	# assert(getSimilarity('cat', 'dog', model) == g[token2id['cat'], token2id['dog']] )
 
 	return g, (edges, vertices), (id2token, token2id)
 
-def filter_graph(weights, edges, vertices, id2token, max_dist=1.0):
+def filter_graph(weights, edges, vertices, id2token,  threshold=1.0):
 
-	new_edges, new_weights = [], []
-	for edge, dist in zip(edges, weights):
-	    if dist <= max_dist:
+	new_edges, new_weights = [], [] # weights: similarity
+	new_distances = []
+	for edge, w in zip(edges, weights):
+	    if w >= threshold:
 	        new_edges.append(edge)
-	        new_weights.append(dist)
-	g = Graph(vertex_attrs={"label":vertices}, edges=new_edges, directed=False)
+	        new_weights.append(w)
+	        new_distances.append(1-w)
+	g0 = Graph(vertex_attrs={"label":vertices}, edges=new_edges, directed=False)
 
-	g.es["weight"] = new_weights
-	g.vs["label"] = [id2token[idx] for idx in vertices]
+	g0.es["sim"] = new_weights
+	g0.es["dist"] = new_distances
+	g0.vs["label"] = [id2token[idx] for idx in vertices]
 
-	return g
+	return g0
 
 def compute_measures_df(g, edges, vertices, id2token, token2id):
+	"""
+	compute centrality measures to output df
+	"""
 
-	# g -> strength, closeness
-	strengthRank = g.strength(None,  weights=g.es['weight'])
-	closenessRank = g.closeness(None, 'all', weights=g.es['weight'], normalized=True)
+	# g -> strength, closeness (continuous)
+	strengthRank = g.strength(None,  weights=g.es['sim'])
+	closenessRank = g.closeness(None, 'all', weights=g.es['dist'], normalized=True)
 
 	# g1 -> betweenness, eigen_centrality
-	g1 = filter_graph(g.es["weight"], edges, vertices, id2token, max_dist=0.5)
+	g1 = filter_graph(g.es["sim"], edges, vertices, id2token, threshold=0.5)
+    
+	eigen_centralityRank = g.eigenvector_centrality(directed=False, weights=g.es['sim'])
 
-	betweennessRank = g1.betweenness(directed=False, weights=g1.es['weight'])
-	eigen_centralityRank = g1.eigenvector_centrality(directed=False, weights=g1.es['weight'])
+	betweennessRank = g.betweenness(vertices=None, 
+                                     directed=False, 
+                                     weights=g.es['dist'])
 
 	# g2 -> degree
-	g2 = filter_graph(g.es["weight"], edges, vertices, id2token, max_dist=0.1)
+	g2 = filter_graph(g.es["sim"], edges, vertices, id2token, threshold=0.2)
 
-	degreeRank = g2.degree(mode='all')
+	degreeRank = g2.degree(None, mode='all')
+	print(degreeRank)
 
 	# frequency
 	wordCounter = defaultdict(int)
@@ -155,6 +165,12 @@ def compute_measures_df(g, edges, vertices, id2token, token2id):
 	rebeccaRank = {w:i+1 for i, w in enumerate(edu_list)}
 	final_words_set = set(token2id.keys()).intersection(edu_list)
 
+	print(len(strengthRank))
+	print(len(betweennessRank))
+	print(len(closenessRank))
+	print(len(eigen_centralityRank))
+	print(len(degreeRank))
+
 	# create df
 	data = []
 	words_inorder = [id2token[idx] for idx in range(len(token2id))]
@@ -169,9 +185,10 @@ def compute_measures_df(g, edges, vertices, id2token, token2id):
 	                    degreeRank[i],
 	                    freqRank[i]])
 
-	
-	df = pd.DataFrame(data, columns=['word', 'rebec', 'strgth', 'close', 'betw', 'eigen', 'degree','freq'])
-	df = df.sort_values(by=['rebec'])
+
+	df = pd.DataFrame(data, columns=['word', 'ppvt', 'strgth', 
+                                     'close', 'betw', 'eigen', 'degree', 'freq'])
+	df = df.sort_values(by=['ppvt'])
 	print(df.head())
 	return df
 
@@ -183,8 +200,8 @@ def build_pos_graph(model, pos_word_set, sampling_size=0, max_dist=1):
 
 	book_set = read_file_to_list(BOOK_WORD_SET_FILE)
 	edu_set = read_file_to_list(REBECCA_WORD_FILE)
-	# valid_pos_words = set(model.wv.vocab.keys()).intersection(edu_set)
-	valid_pos_words = set(model.wv.vocab.keys()).intersection(pos_word_set)
+	valid_pos_words = set(model.wv.vocab.keys()).intersection(edu_set)
+	valid_pos_words = set(valid_pos_words).intersection(pos_word_set)
 	# print('pos_word_set', len(pos_word_set))
 
 	token2vec = {}
@@ -206,11 +223,11 @@ def build_pos_graph(model, pos_word_set, sampling_size=0, max_dist=1):
 
 	vertices = [idx for idx in range(len(token2vec))]
 	edges = [(i, j) for i in vertices for j in vertices if i < j]
-	weights = [getDistance(id2token[i], id2token[j], model) for i, j in edges]
+	weights = [getSimilarity(id2token[i], id2token[j], model) for i, j in edges]
 
 	g = filter_graph(weights, edges, vertices, id2token, max_dist)
 
-	return g
+	return g, (edges, vertices), (id2token, token2id)
 
 def read_docs():
 	with open(LEMMA_BOOK_FILE) as f:
