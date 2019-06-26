@@ -28,7 +28,7 @@ def read_file_to_list(filename):
 
 def getDistance(w1, w2, model):
 
-    return abs(spatial.distance.cosine(model.wv[w1], model.wv[w2]))
+    return abs(1 - spatial.distance.cosine(model.wv[w1], model.wv[w2]))
 
 def load_pretrained_word2vec(documents, size, min_count, iters, retrain=False):
 	GOOGLE_W2V_FILE = './model/GoogleNews-vectors-negative300.bin'
