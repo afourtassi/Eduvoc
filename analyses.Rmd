@@ -1,0 +1,69 @@
+---
+title: "WordRec Experiment"
+author: "A. Fourtassi"
+date: "November 26, 2018"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+---
+Libraries.
+
+```{r}
+library(kableExtra)
+library(readr)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(knitr)
+library(nlstools)
+library(boot)
+library(dplyr)
+library(langcog)
+library(ggthemes)
+library(broom)
+```
+
+Data and processing
+```{r}
+
+data <- read.csv(file="output/rankings_0603_old_book.csv", header=TRUE, sep=",") %>%
+  as.data.frame() %>%
+  mutate(log_freq = log(freq))
+
+data_facebook <- read.csv(file="output/rankings_0603_170.csv", header=TRUE, sep=",") %>%
+  as.data.frame() %>%
+  mutate(log_freq = log(freq))
+
+freq_childs <- read.csv(file="output/log_freq.csv", header=TRUE, sep=",") %>%
+  as.data.frame() %>%
+  rename(word = uni_lemma,
+         freq_chil = freq)
+
+data.scaled <- data %>%
+  left_join(freq_childs) %>%
+  mutate_each_(funs(scale(.) %>% as.vector), 
+                             vars=c("ppvt","strgth","close","betw","eigen","degree","freq","log_freq", "freq_chil"))
+
+data_facebook.scaled <- data_facebook %>%
+  left_join(freq_childs) %>%
+  mutate_each_(funs(scale(.) %>% as.vector), 
+                             vars=c("ppvt","strgth","close","betw","eigen","degree","freq", "log_freq","freq_chil"))
+
+
+h <- pcor.test(data_facebook.scaled$ppvt, data_facebook.scaled$degree, data_facebook.scaled$log_freq, method = c("kendall"))
+
+
+model1 <- lm(ppvt ~ strgth + log_freq, data=data_facebook.scaled)
+summary(model1)
+
+model0 <- lm(ppvt ~ strgth + freq, data=data.scaled)
+summary(model0)
+
+model1 <- lm(rebec ~ eigen + freq_chil , data=data.scaled)
+summary(model1)
+
+anova(model0, model1)
+
+```
